@@ -12,6 +12,7 @@ const userSchema = new mongoose.Schema({
         minLength: [3, 'Your name cannot be less than 3 characters'],
     },
     email: {
+        type: String,
         unique: true,
         validate: [validator.isEmail, "Please enter a valid email address"]
     },
@@ -43,4 +44,13 @@ const userSchema = new mongoose.Schema({
     resetPasswordExpire: Date,
 });
 
-module.exports = mongoose.model('user',userSchema);
+//const UserModel = mongoose.model('Users',userSchema);
+
+// JWT TOKEN
+userSchema.methods.getJWTToken = function () {
+    return jwt.sign({ id: this._id }, process.env.JWT_SECRET, {
+      expiresIn: process.env.JWT_EXPIRE,
+    });
+};
+
+module.exports = mongoose.model('Users',userSchema);
