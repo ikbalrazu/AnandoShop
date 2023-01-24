@@ -4,6 +4,7 @@ const app = express();
 const cookieParser = require('cookie-parser');
 const bodyParser = require('body-parser');
 const fileUpload = require('express-fileupload');
+const errorMiddleware = require('./middleware/error');
 
 app.use(express.json());
 app.use(cookieParser());
@@ -14,6 +15,7 @@ app.use(fileUpload());
 const user = require('./routes/userRoute');
 
 // Error Handler
+app.use(errorMiddleware);
 
 app.get("/",(req,res)=>{
     res.send("Welcome to Anando Shop");

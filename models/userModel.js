@@ -46,11 +46,38 @@ const userSchema = new mongoose.Schema({
 
 //const UserModel = mongoose.model('Users',userSchema);
 
+//encrypting password before saving user
+userSchema.pre('save', async function(next){
+    if(!this.isModified('password')){
+        next();
+    }
+    this.password = await bcrypt.hash(this.password, 10);
+});
+
 // JWT TOKEN
 userSchema.methods.getJWTToken = function () {
     return jwt.sign({ id: this._id }, process.env.JWT_SECRET, {
       expiresIn: process.env.JWT_EXPIRE,
     });
 };
+
+//Compare user password
+userSchema.methods.comparePassword = async function (enteredPassword){
+    return await bcrypt.compare(enteredPassword, this.password);
+};
+
+//generate password reset token
+userSchema.methods.getResetPasswordToken = function(){
+    //generate token
+    const resetToken = crypto.randomBytes(20).toString('hex');
+
+    //hash and set to resetPasswordToken field
+    this.resetPasswordToken = crypto.createHash('sha256').update(resetToken).digest('hex');
+
+    //set token expire time
+    this.resetPasswordExpire = Date.now() + 30 * 60 * 1000;
+
+    return resetToken;
+}
 
 module.exports = mongoose.model('Users',userSchema);

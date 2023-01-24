@@ -22,3 +22,52 @@ exports.registerUser = catchAsyncErrors(async(req,res,next)=>{
 
     sendToken(user, 200, res);
 })
+
+exports.loginUser = catchAsyncErrors(async(req,res,next)=>{
+    const {email, password} = req.body;
+
+    //checks if email and password is entered by user
+    if(!email || !password){
+        return next(new ErrorHandler('Please enter email & password', 400));
+    }
+
+    //Finding user in database
+    const user = await User.findOne({email}).select("+password");
+
+    if(!user){
+        return next(new ErrorHandler("Invalid email", 400));
+    }
+
+    //checks if password is correct or not
+    const isPasswordMatched = await user.comparePassword(password);
+
+    if(!isPasswordMatched){
+        return next(new ErrorHandler('Invalid password',401));
+    }
+
+    sendToken(user, 200, res);
+});
+
+//logout user
+exports.logout = catchAsyncErrors(async(req,res,next)=>{
+    res.cookie('token',null,{
+        expires: new Date(Date.now()),
+        httpOnly: true,
+    });
+});
+
+//forgot password
+exports.forgotPassword = catchAsyncErrors(async(req,res,next)=>{
+    if(!req.body.email){
+        return next(new ErrorHandler('Please enter your email', 400));
+    }
+
+    const user = await User.findOne({email: req.body.email});
+
+    if(!user){
+        return next(new ErrorHandler('User not found with this email', 404));
+    }
+
+    //Get reset token
+    const resetToken = user.getResetPasswordToken()
+})
