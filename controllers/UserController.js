@@ -2,6 +2,8 @@ const ErrorHandler = require('../utils/errorHandler');
 const catchAsyncErrors = require('../middleware/catchAsyncErrors');
 const User = require('../models/userModel');
 const sendToken = require('../utils/jwtToken');
+const sendEmail = require('../sendEmail');
+const crypto = require('node:crypto');
 
 exports.registerUser = catchAsyncErrors(async(req,res,next)=>{
     const {name, email, password} = req.body;
@@ -69,5 +71,65 @@ exports.forgotPassword = catchAsyncErrors(async(req,res,next)=>{
     }
 
     //Get reset token
-    const resetToken = user.getResetPasswordToken()
-})
+    const resetToken = user.getResetPasswordToken();
+
+    await user.save({validateBeforeSave: false});
+
+    //Create reset password url
+    const resetUrl = `${req.protocol}://${req.get('host')}/password/reset/${resetToken}`;
+    const message = `Your password reset token is as follow:- \n\n ${resetUrl} \n\nIf you have not requested this email then, please ignore it.`;
+
+    try{
+        await sendEmail({
+            email: user.email,
+            subject:'ShopIt password recovery',
+            message,
+        });
+
+        res.status(200).json({
+            success: true,
+            message: `Email sent to: ${user.email}`,
+        });
+
+    }catch(error){
+        user.resetPasswordToken = undefined;
+        user.resetPasswordExpire = undefined;
+    }
+
+});
+
+//Reset password => /password/reset/:token
+exports.resetPassword = catchAsyncErrors(async(req,res,next)=>{
+    //Hash URL token
+    const resetPasswordToken = crypto
+       .createHash('sha256')
+       .update(req.params.token)
+       .digest('hex');
+
+    console.log(resetPasswordToken);
+
+    const user = await User.findOne({
+        resetPasswordToken,
+        resetPasswordExpire: {$gt: Date.now()},
+    });
+
+    console.log(user);
+
+    if(!user){
+        return next(new ErrorHandler('Password reset token is invalid or has been expired',400));
+    }
+
+    if(req.body.password !== req.body.confirmPassword){
+        return next(new ErrorHandler('Password does not match', 400));
+    }
+
+    //setup new password
+    user.password = req.body.password;
+
+    user.resetPasswordToken = undefined;
+    user.resetPasswordExpire = undefined;
+
+    await user.save();
+
+    sendToken(user,200,res);
+});
